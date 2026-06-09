@@ -65,6 +65,36 @@ describe('FFmpeg command builder', () => {
     expect(command.args[0]).toBe('-y');
   });
 
+  it('includes metadata preservation arguments', () => {
+    const command = buildFfmpegCommand({ inputPath, outputPath });
+
+    expect(command.args).toContain('-map_metadata');
+    expect(command.args).toContain('-map_chapters');
+    expect(command.args).toContain('use_metadata_tags');
+  });
+
+  it('includes explicit metadata tags when snapshot is provided', () => {
+    const command = buildFfmpegCommand({
+      inputPath,
+      outputPath,
+      metadataSnapshot: {
+        formatTags: { artist: 'Sony Camera' },
+        streams: [
+          {
+            index: 0,
+            codecType: 'video',
+            tags: { creation_time: '2024-01-01T12:00:00.000000Z' },
+          },
+        ],
+        hasSubtitleStreams: false,
+      },
+    });
+
+    expect(command.args).toContain('artist=Sony Camera');
+    expect(command.args).toContain('-metadata:s:v:0');
+    expect(command.args).toContain('creation_time=2024-01-01T12:00:00.000000Z');
+  });
+
   it('includes all required encode arguments', () => {
     const command = buildFfmpegCommand({ inputPath, outputPath });
 

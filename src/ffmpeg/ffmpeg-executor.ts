@@ -2,6 +2,7 @@ import { execa } from 'execa';
 import fs from 'fs-extra';
 import path from 'node:path';
 import { buildFfmpegCommand } from './ffmpeg-command-builder.js';
+import { FfprobeService } from './ffprobe-service.js';
 import type { FfmpegEncodeOptions } from '../types/index.js';
 
 export class FfmpegNotFoundError extends Error {
@@ -29,15 +30,18 @@ export interface FfmpegExecutorOptions {
 export class FfmpegExecutor {
   private readonly executable: string;
   private readonly cancelSignal?: AbortSignal;
+  private readonly ffprobe: FfprobeService;
 
   constructor(options: FfmpegExecutorOptions = {}) {
     this.executable = options.executable ?? 'ffmpeg';
     this.cancelSignal = options.cancelSignal;
+    this.ffprobe = new FfprobeService('ffprobe', options.cancelSignal);
   }
 
   async verifyAvailable(): Promise<void> {
     try {
       await execa(this.executable, ['-version'], { cancelSignal: this.cancelSignal });
+      await this.ffprobe.verifyAvailable();
     } catch (error) {
       if (this.isMissingExecutable(error)) {
         throw new FfmpegNotFoundError();
@@ -60,11 +64,17 @@ export class FfmpegExecutor {
   }
 
   async convert(options: FfmpegEncodeOptions, overwrite = true): Promise<void> {
+    const inputPath = path.resolve(options.inputPath);
+    const outputPath = path.resolve(options.outputPath);
+    const metadataSnapshot =
+      options.metadataSnapshot ?? (await this.ffprobe.extractMetadata(inputPath));
+
     const command = buildFfmpegCommand(
       {
-        inputPath: path.resolve(options.inputPath),
-        outputPath: path.resolve(options.outputPath),
+        inputPath,
+        outputPath,
         lutPath: options.lutPath ? path.resolve(options.lutPath) : undefined,
+        metadataSnapshot,
       },
       { executable: this.executable, overwrite },
     );

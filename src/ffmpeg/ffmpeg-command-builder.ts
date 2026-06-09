@@ -1,6 +1,8 @@
 import path from 'node:path';
 import type { FfmpegCommand, FfmpegEncodeOptions } from '../types/index.js';
+import type { MediaMetadataSnapshot } from '../types/metadata.js';
 import { escapeFfmpegFilterPath } from '../utils/paths.js';
+import { buildMetadataCopyArgs } from './metadata-args-builder.js';
 import {
   ENCODE_ARGS,
   NO_OVERWRITE_ARG,
@@ -37,6 +39,7 @@ export function buildFfmpegCommand(
     '-vf',
     videoFilter,
     ...ENCODE_ARGS,
+    ...buildMetadataArgs(options.metadataSnapshot),
     options.outputPath,
   ];
 
@@ -55,4 +58,12 @@ export function formatFfmpegCommand(command: FfmpegCommand): string {
     /\s/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg,
   );
   return [command.executable, ...quotedArgs].join(' ');
+}
+
+function buildMetadataArgs(snapshot?: MediaMetadataSnapshot): string[] {
+  if (!snapshot) {
+    return ['-map_metadata', '0', '-map_chapters', '0', '-movflags', 'use_metadata_tags'];
+  }
+
+  return buildMetadataCopyArgs(snapshot);
 }

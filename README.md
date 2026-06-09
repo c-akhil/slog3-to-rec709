@@ -12,6 +12,7 @@ Cross-platform CLI for **macOS**, **Windows**, and **Linux**.
 - Parallel processing with configurable concurrency (default: 4)
 - Progress bar with ETA
 - Optional `.cube` LUT for highest color accuracy
+- Automatic metadata and timestamp preservation (container, stream, filesystem)
 - Built-in S-Log3 → Rec.709 filter chain when no LUT is supplied
 - Dry-run mode
 - Resume mode (idempotent — skips only verified successes via state file)
@@ -21,7 +22,7 @@ Cross-platform CLI for **macOS**, **Windows**, and **Linux**.
 ## Requirements
 
 - **Node.js 20+** — [nodejs.org](https://nodejs.org)
-- **FFmpeg** with `libx264` and `lut3d` filter support — must be available on your `PATH`
+- **FFmpeg** with `libx264`, `lut3d`, and `ffprobe` support — must be available on your `PATH`
 
 Verify both are installed:
 
@@ -402,9 +403,21 @@ After each run, a JSON report is written (default: `.slog709-report.json` in the
   "totalFiles": 120,
   "processed": 118,
   "failed": 2,
+  "metadataIssues": 3,
   "durationSeconds": 3842.5
 }
 ```
+
+## Metadata Preservation
+
+Every converted file automatically:
+
+1. Copies container and stream metadata from the source via FFmpeg (`-map_metadata`, explicit `-metadata` tags, chapters)
+2. Re-applies any missing metadata in a lossless remux pass when needed
+3. Preserves filesystem modified/created timestamps where the OS allows it
+4. Verifies source vs output metadata with `ffprobe` and logs any fields that could not be copied
+
+Fields that cannot be preserved (for example subtitle-stream metadata when only video/audio are output) are logged as limitations. See the conversion report `metadataIssues` count and per-file log output.
 
 ## Camera Assumptions
 
@@ -427,17 +440,21 @@ src/
 │   ├── file-scanner-service.ts # Recursive .MP4 discovery
 │   ├── progress-service.ts     # Progress bar + ETA
 │   ├── report-service.ts       # JSON report
-│   └── state-service.ts        # Idempotent resume state
+│   ├── state-service.ts        # Idempotent resume state
+│   └── metadata-service.ts     # Metadata/timestamp preservation
 ├── ffmpeg/
 │   ├── ffmpeg-command-builder.ts
 │   ├── ffmpeg-executor.ts      # execa wrapper
-│   └── ffmpeg-filters.ts       # S-Log3 filter chain
+│   ├── ffmpeg-filters.ts       # S-Log3 filter chain
+│   ├── ffprobe-service.ts      # Metadata extraction
+│   └── metadata-args-builder.ts
 ├── validation/                 # Zod schemas
 ├── utils/                      # Paths, logging
 └── types/
 tests/
 ├── path-validation.test.ts
 ├── ffmpeg-command-builder.test.ts
+├── metadata-args-builder.test.ts
 └── state-service.test.ts
 ```
 

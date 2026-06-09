@@ -18,6 +18,7 @@ import {
   shouldSkipFile,
   StateService,
 } from './state-service.js';
+import { MetadataService } from './metadata-service.js';
 import { isOutputInsideInput } from '../utils/paths.js';
 import { logger } from '../utils/logger.js';
 
@@ -119,6 +120,8 @@ export class ConversionService {
     this.progress.start(pendingJobs.length);
     const limit = pLimit(options.concurrency);
     const executor = new FfmpegExecutor({ cancelSignal: this.abortController.signal });
+    const metadataService = new MetadataService(this.abortController.signal);
+    let metadataIssues = 0;
 
     try {
       await Promise.all(
@@ -128,11 +131,12 @@ export class ConversionService {
               return;
             }
 
-            const result = await this.processJob(job, executor, options, state);
+            const result = await this.processJob(job, executor, metadataService, options, state);
             results.push(result);
             this.progress.tick(job.relativePath);
 
             if (result.status === 'success') {
+              metadataIssues += result.metadataIssues ?? 0;
               logger.success(`Converted: ${job.relativePath}`);
             } else if (result.status === 'failed') {
               logger.error(`Failed: ${job.relativePath} — ${result.error}`);
@@ -149,11 +153,16 @@ export class ConversionService {
       totalFiles: jobs.length,
       processed: summary.processed,
       failed: summary.failed,
+      metadataIssues,
       durationSeconds: (Date.now() - startTime) / 1000,
     };
 
     const reportFile = await this.reportService.write(report, options.reportPath);
     logger.info(`Report written to ${reportFile}`);
+
+    if (metadataIssues > 0) {
+      logger.warn(`${metadataIssues} metadata field(s) could not be fully preserved. See logs above.`);
+    }
 
     if (this.interrupted) {
       logger.warn('Conversion interrupted. Re-run with --resume to continue from state file.');
@@ -219,9 +228,10 @@ export class ConversionService {
   private async processJob(
     job: VideoJob,
     executor: FfmpegExecutor,
+    metadataService: MetadataService,
     options: ConvertOptions,
     state: StateService,
-  ): Promise<JobResult> {
+  ): Promise<JobResult & { metadataIssues?: number }> {
     const inputFingerprint = await readInputFingerprint(job.inputPath);
 
     try {
@@ -251,6 +261,12 @@ export class ConversionService {
       );
 
       await verifyOutputCreated(job.outputPath);
+
+      const { verification } = await metadataService.preserveAfterConversion(
+        job.inputPath,
+        job.outputPath,
+      );
+
       const outputSize = await readOutputSize(job.outputPath);
       await state.markStatus(job, 'success', { inputFingerprint, outputSize });
 
@@ -258,6 +274,7 @@ export class ConversionService {
         status: 'success',
         inputPath: job.inputPath,
         outputPath: job.outputPath,
+        metadataIssues: verification.mismatches.length,
       };
     } catch (error) {
       const message = formatJobError(error);

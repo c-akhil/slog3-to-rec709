@@ -11,6 +11,7 @@ export class ReportService {
       totalFiles: report.totalFiles,
       processed: report.processed,
       failed: report.failed,
+      metadataIssues: report.metadataIssues,
       durationSeconds: Math.round(report.durationSeconds * 100) / 100,
     };
 
@@ -25,6 +26,7 @@ export function createEmptyReport(totalFiles: number): ConversionReport {
     totalFiles,
     processed: 0,
     failed: 0,
+    metadataIssues: 0,
     durationSeconds: 0,
   };
 }

@@ -35,7 +35,7 @@ export class ConvertHandler {
       const report = await this.conversionService.convert(parsed);
       logger.info(
         `Done — processed: ${report.processed}, failed: ${report.failed}, ` +
-          `duration: ${report.durationSeconds}s`,
+          `metadata issues: ${report.metadataIssues}, duration: ${report.durationSeconds}s`,
       );
     } catch (error) {
       this.handleError(error);

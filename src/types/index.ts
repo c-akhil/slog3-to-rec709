@@ -2,6 +2,7 @@ export interface ConversionReport {
   totalFiles: number;
   processed: number;
   failed: number;
+  metadataIssues: number;
   durationSeconds: number;
 }
 
@@ -56,10 +57,13 @@ export type JobResult =
   | { status: 'skipped'; inputPath: string; outputPath: string; reason: string }
   | { status: 'failed'; inputPath: string; outputPath: string; error: string };
 
+import type { MediaMetadataSnapshot } from './metadata.js';
+
 export interface FfmpegEncodeOptions {
   inputPath: string;
   outputPath: string;
   lutPath?: string;
+  metadataSnapshot?: MediaMetadataSnapshot;
 }
 
 export interface FfmpegCommand {
