@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.npm-cache/
+*.log
+.DS_Store
+coverage/
+.slog709-report.json
+input-videos/
+output-videos/
