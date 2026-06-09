@@ -2,6 +2,8 @@
 
 Batch-convert Sony **ILCE-7SM3 (A7S III)** S-Log3 / S-Gamut3.Cine `.MP4` footage to **Rec.709** using FFmpeg.
 
+Cross-platform CLI for **macOS**, **Windows**, and **Linux**.
+
 ## Features
 
 - Recursively scans input directories (all subfolders)
@@ -18,37 +20,135 @@ Batch-convert Sony **ILCE-7SM3 (A7S III)** S-Log3 / S-Gamut3.Cine `.MP4` footage
 
 ## Requirements
 
-- **Node.js 20+**
-- **FFmpeg** with `libx264` and `lut3d` filter support
+- **Node.js 20+** — [nodejs.org](https://nodejs.org)
+- **FFmpeg** with `libx264` and `lut3d` filter support — must be available on your `PATH`
+
+Verify both are installed:
+
+```bash
+node --version    # v20.0.0 or higher
+ffmpeg -version
+```
 
 ## Installation
 
-### macOS
+slog709 runs on **macOS**, **Windows**, and **Linux**. Clone the repo, install dependencies, and build:
 
 ```bash
-# Install FFmpeg
-brew install ffmpeg
-
-# Clone and install slog709
+git clone <repo-url> slog709
 cd slog709
 npm install
 npm run build
-npm link   # optional — installs `slog709` globally
 ```
 
-### Run without linking
+Optional — install the `slog709` command globally:
 
-If you haven't run `npm link`, use one of these from the project directory:
+```bash
+npm link
+```
+
+### macOS
+
+Install FFmpeg with [Homebrew](https://brew.sh):
+
+```bash
+brew install ffmpeg
+```
+
+Example paths:
+
+| Path type | Example |
+|-----------|---------|
+| Local folder | `./input-videos` |
+| External drive | `/Volumes/Footage` |
+| Home directory | `~/Footage` |
+
+### Windows
+
+Install FFmpeg using one of:
+
+```powershell
+# winget (recommended)
+winget install Gyan.FFmpeg
+
+# Chocolatey
+choco install ffmpeg
+
+# Scoop
+scoop install ffmpeg
+```
+
+Example paths:
+
+| Path type | Example |
+|-----------|---------|
+| Local folder | `.\input-videos` |
+| Drive root | `D:\Footage` |
+| Path with spaces | `"D:\My Footage\pre-wedding"` |
+
+Use **PowerShell** or **Command Prompt**. In PowerShell, line continuation is `` ` `` (backtick):
+
+```powershell
+npm start -- convert `
+  --input "D:\pre-wedding" `
+  --output "D:\output-videos"
+```
+
+In Command Prompt, use `^` for line continuation:
+
+```cmd
+npm start -- convert ^
+  --input "D:\pre-wedding" ^
+  --output "D:\output-videos"
+```
+
+### Linux
+
+Install FFmpeg with your package manager:
+
+```bash
+# Debian / Ubuntu
+sudo apt update && sudo apt install ffmpeg
+
+# Fedora
+sudo dnf install ffmpeg
+
+# Arch
+sudo pacman -S ffmpeg
+```
+
+Example paths:
+
+| Path type | Example |
+|-----------|---------|
+| Local folder | `./input-videos` |
+| Mounted drive | `/mnt/footage` |
+| Home directory | `~/Footage` |
+
+### Run without `npm link`
+
+From the project directory, on any OS:
 
 ```bash
 npm start -- convert --input "./input-videos" --output "./output-videos"
-# or:
+```
+
+Alternatives:
+
+```bash
 node dist/index.js convert --input "./input-videos" --output "./output-videos"
-# or during development:
-npm run dev -- convert --input "./input-videos" --output "./output-videos"
+npm run dev -- convert --input "./input-videos" --output "./output-videos"   # development
+```
+
+After `npm link`, use the global command:
+
+```bash
+slog709 convert --input "./input-videos" --output "./output-videos"
 ```
 
 ## Sample Usages
+
+Examples below use **bash** syntax (`\` line continuation). See the [Windows](#windows) section for PowerShell/CMD variants.
 
 ### Quick start (local folders)
 
@@ -58,6 +158,14 @@ Place `.MP4` files in `input-videos/`. Converted files appear in `output-videos/
 npm start -- convert \
   --input "./input-videos" \
   --output "./output-videos"
+```
+
+**Windows (PowerShell):**
+
+```powershell
+npm start -- convert `
+  --input ".\input-videos" `
+  --output ".\output-videos"
 ```
 
 ### With Sony Look Profile LUT (recommended)
@@ -71,6 +179,15 @@ npm start -- convert \
   --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube"
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+npm start -- convert `
+  --input ".\input-videos" `
+  --output ".\output-videos" `
+  --lut ".\SonyLookProfiles_SLog3_SGamut3Cine\1_SGamut3CineSLog3_To_LC-709.cube"
+```
+
 | LUT file | Look |
 |----------|------|
 | `1_SGamut3CineSLog3_To_LC-709.cube` | Standard Rec.709 (recommended) |
@@ -78,21 +195,34 @@ npm start -- convert \
 | `3_SGamut3CineSLog3_To_SLog2-709.cube` | S-Log2 in Rec.709 space |
 | `4_SGamut3CineSLog3_To_Cine+709.cube` | Cinematic Rec.709 |
 
-After `npm link`, the same command works with the global binary:
+### External drive / large batch
 
-```bash
-slog709 convert \
-  --input "./input-videos" \
-  --output "./output-videos" \
-  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube"
-```
-
-### External drive (batch archive)
+**macOS:**
 
 ```bash
 slog709 convert \
   --input "/Volumes/Footage/2024/Wedding" \
   --output "/Volumes/Footage_REC709/2024/Wedding" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
+  --concurrency 8
+```
+
+**Windows:**
+
+```powershell
+slog709 convert `
+  --input "E:\Footage\2024\Wedding" `
+  --output "E:\Footage_REC709\2024\Wedding" `
+  --lut ".\SonyLookProfiles_SLog3_SGamut3Cine\1_SGamut3CineSLog3_To_LC-709.cube" `
+  --concurrency 8
+```
+
+**Linux:**
+
+```bash
+slog709 convert \
+  --input "/mnt/footage/2024/Wedding" \
+  --output "/mnt/footage_rec709/2024/Wedding" \
   --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
   --concurrency 8
 ```
@@ -139,6 +269,16 @@ Example output:
   → ffmpeg -y -hide_banner ... -vf "lut3d=..." -c:v libx264 -crf 18 ...
 ```
 
+### One video at a time
+
+```bash
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
+  --concurrency 1
+```
+
 ### Resume interrupted batch (idempotent)
 
 Resume uses a state file (default: `<output>/.slog709-state.json`) to track each file. With `--resume`:
@@ -171,8 +311,8 @@ Example state entry:
 ```json
 {
   "version": 1,
-  "input": "/Users/akhilkumar/akhil/pre-wedding",
-  "output": "/Users/akhilkumar/akhil/orginal-videos/output-videos",
+  "input": "/path/to/pre-wedding",
+  "output": "/path/to/output-videos",
   "files": {
     "Ceremony/C4400.MP4": {
       "status": "success",
@@ -210,6 +350,19 @@ slog709 convert \
   --resume \
   --report "./reports/conversion-report.json"
 ```
+
+## Platform Notes
+
+| Topic | macOS / Linux | Windows |
+|-------|---------------|---------|
+| Path separators | `/` | `\` (both work when quoted) |
+| Line continuation | `\` | `` ` `` in PowerShell, `^` in CMD |
+| External drives | `/Volumes/Name` (macOS), `/mnt/...` (Linux) | `D:\`, `E:\`, etc. |
+| Global CLI | `npm link` → `slog709` | Same — npm adds `slog709.cmd` |
+| State file | `<output>/.slog709-state.json` | Same |
+| Interrupt | `Ctrl+C` (SIGINT) | `Ctrl+C` |
+
+Paths with spaces must be quoted on all platforms: `"D:\My Footage"`, `"/Volumes/My Drive"`.
 
 ## CLI Options
 
@@ -273,7 +426,8 @@ src/
 │   ├── conversion-service.ts   # Orchestration
 │   ├── file-scanner-service.ts # Recursive .MP4 discovery
 │   ├── progress-service.ts     # Progress bar + ETA
-│   └── report-service.ts       # JSON report
+│   ├── report-service.ts       # JSON report
+│   └── state-service.ts        # Idempotent resume state
 ├── ffmpeg/
 │   ├── ffmpeg-command-builder.ts
 │   ├── ffmpeg-executor.ts      # execa wrapper
@@ -283,7 +437,8 @@ src/
 └── types/
 tests/
 ├── path-validation.test.ts
-└── ffmpeg-command-builder.test.ts
+├── ffmpeg-command-builder.test.ts
+└── state-service.test.ts
 ```
 
 ## Development
