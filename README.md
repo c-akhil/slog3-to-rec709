@@ -38,57 +38,138 @@ npm link   # optional — installs `slog709` globally
 
 ### Run without linking
 
+If you haven't run `npm link`, use one of these from the project directory:
+
 ```bash
-npm run dev -- convert --input "/path/to/footage" --output "/path/to/output"
-# or after build:
-node dist/index.js convert --input "..." --output "..."
+npm start -- convert --input "./input-videos" --output "./output-videos"
+# or:
+node dist/index.js convert --input "./input-videos" --output "./output-videos"
+# or during development:
+npm run dev -- convert --input "./input-videos" --output "./output-videos"
 ```
 
-## Usage
+## Sample Usages
 
-### With a LUT (recommended for best color)
+### Quick start (local folders)
+
+Place `.MP4` files in `input-videos/`. Converted files appear in `output-videos/` with the same folder structure.
+
+```bash
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos"
+```
+
+### With Sony Look Profile LUT (recommended)
+
+Download Sony's official S-Log3 / S-Gamut3.Cine look profiles and place them in the project (or anywhere on disk). For standard Rec.709 output, use **`1_SGamut3CineSLog3_To_LC-709.cube`**:
+
+```bash
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube"
+```
+
+| LUT file | Look |
+|----------|------|
+| `1_SGamut3CineSLog3_To_LC-709.cube` | Standard Rec.709 (recommended) |
+| `2_SGamut3CineSLog3_To_LC-709TypeA.cube` | Rec.709 Type A |
+| `3_SGamut3CineSLog3_To_SLog2-709.cube` | S-Log2 in Rec.709 space |
+| `4_SGamut3CineSLog3_To_Cine+709.cube` | Cinematic Rec.709 |
+
+After `npm link`, the same command works with the global binary:
 
 ```bash
 slog709 convert \
-  --input "/Volumes/Footage" \
-  --output "/Volumes/Footage_REC709" \
-  --lut "/Users/me/LUTs/SLog3_to_Rec709.cube"
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube"
 ```
 
-### Built-in S-Log3 → Rec.709 conversion (no LUT)
+### External drive (batch archive)
 
 ```bash
 slog709 convert \
-  --input "/Volumes/Footage" \
-  --output "/Volumes/Footage_REC709" \
+  --input "/Volumes/Footage/2024/Wedding" \
+  --output "/Volumes/Footage_REC709/2024/Wedding" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
   --concurrency 8
 ```
 
-### Dry-run (preview commands without converting)
+Subfolders are preserved automatically:
+
+```
+input-videos/
+├── Ceremony/C4400.MP4
+└── Reception/C4401.MP4
+
+output-videos/
+├── Ceremony/C4400.MP4
+└── Reception/C4401.MP4
+```
+
+### Built-in conversion (no LUT)
+
+Uses FFmpeg color filters when no `.cube` file is supplied. Handy for testing; a LUT gives better color accuracy.
 
 ```bash
-slog709 convert \
-  --input "/Volumes/Footage" \
-  --output "/Volumes/Footage_REC709" \
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --concurrency 4
+```
+
+### Dry-run (preview FFmpeg commands)
+
+Prints the exact FFmpeg command for each file without writing any output:
+
+```bash
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
   --dry-run
 ```
 
-### Resume (skip files already converted)
+Example output:
+
+```
+[dry-run] Ceremony/C4400.MP4
+  → ffmpeg -y -hide_banner ... -vf "lut3d=..." -c:v libx264 -crf 18 ...
+```
+
+### Resume interrupted batch
+
+Skips output files that already exist and only converts what's missing:
 
 ```bash
-slog709 convert \
-  --input "/Volumes/Footage" \
-  --output "/Volumes/Footage_REC709" \
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
   --resume
 ```
 
 ### Custom report path
 
 ```bash
+npm start -- convert \
+  --input "./input-videos" \
+  --output "./output-videos" \
+  --report "./reports/run-2024-06-09.json"
+```
+
+### Full example (all options)
+
+```bash
 slog709 convert \
   --input "/Volumes/Footage" \
   --output "/Volumes/Footage_REC709" \
-  --report "/tmp/conversion-report.json"
+  --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
+  --concurrency 8 \
+  --resume \
+  --report "./reports/conversion-report.json"
 ```
 
 ## CLI Options
