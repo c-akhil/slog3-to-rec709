@@ -16,8 +16,12 @@ export function registerConvertCommand(program: Command): void {
       '4',
     )
     .option('--dry-run', 'Print planned conversions without executing FFmpeg', false)
-    .option('--resume', 'Skip files whose output already exists', false)
+    .option('--resume', 'Skip files recorded as successfully converted in the state file', false)
     .option('-r, --report <path>', 'Path for JSON conversion report')
+    .option(
+      '-s, --state <path>',
+      'Path for resume state JSON (default: <output>/.slog709-state.json)',
+    )
     .action(async (options) => {
       const handler = new ConvertHandler();
       await handler.handle(options);

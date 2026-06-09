@@ -25,7 +25,10 @@ export class ConvertHandler {
       logger.info('Mode: dry-run');
     }
     if (parsed.resume) {
-      logger.info('Mode: resume (skip existing outputs)');
+      logger.info('Mode: resume (skip successfully converted files)');
+    }
+    if (parsed.statePath) {
+      logger.info(`State:  ${parsed.statePath}`);
     }
 
     try {
@@ -53,6 +56,7 @@ export class ConvertHandler {
       dryRun: cliResult.data.dryRun,
       resume: cliResult.data.resume,
       reportPath: cliResult.data.report ? path.resolve(cliResult.data.report) : undefined,
+      statePath: cliResult.data.state ? path.resolve(cliResult.data.state) : undefined,
     };
 
     const validated = convertOptionsSchema.safeParse(options);

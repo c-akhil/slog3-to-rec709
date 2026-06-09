@@ -11,6 +11,13 @@ import {
 } from './file-scanner-service.js';
 import { ProgressService, summarizeResults } from './progress-service.js';
 import { createEmptyReport, ReportService } from './report-service.js';
+import {
+  readInputFingerprint,
+  readOutputSize,
+  removePartialOutput,
+  shouldSkipFile,
+  StateService,
+} from './state-service.js';
 import { isOutputInsideInput } from '../utils/paths.js';
 import { logger } from '../utils/logger.js';
 
@@ -57,16 +64,47 @@ export class ConversionService {
 
     logger.info(`Found ${jobs.length} .MP4 file(s) to process.`);
 
+    const stateLoad = await StateService.load(options);
+    const state = stateLoad.service;
+
+    if (stateLoad.incompatible) {
+      logger.warn(
+        'Existing state file does not match current input/output/LUT settings. Starting a fresh run.',
+      );
+    }
+
+    if (!options.dryRun) {
+      logger.info(`State file: ${state.getPath()}`);
+    }
+
     if (options.dryRun) {
-      return this.runDryRun(jobs, options, startTime);
+      return this.runDryRun(jobs, options, state, startTime);
     }
 
-    const pendingJobs = await this.filterJobs(jobs, options.resume);
-    const skippedCount = jobs.length - pendingJobs.length;
+    const { pending: pendingJobs, skipped: skippedJobs } = await state.classifyJobs(
+      jobs,
+      options.resume,
+      isValidExistingOutput,
+      readInputFingerprint,
+    );
 
-    if (skippedCount > 0) {
-      logger.info(`Skipping ${skippedCount} existing output file(s) (resume mode).`);
+    if (options.resume && skippedJobs.length > 0) {
+      logger.info(`Skipping ${skippedJobs.length} successfully converted file(s) (resume mode).`);
     }
+
+    if (options.resume && pendingJobs.length > 0) {
+      const partialCount = await this.countPartialOutputs(pendingJobs);
+      if (partialCount > 0) {
+        logger.info(`Re-processing ${partialCount} partial or incomplete file(s).`);
+      }
+    }
+
+    const results: JobResult[] = skippedJobs.map((job) => ({
+      status: 'skipped',
+      inputPath: job.inputPath,
+      outputPath: job.outputPath,
+      reason: 'Previously converted successfully',
+    }));
 
     if (pendingJobs.length === 0) {
       logger.info('All files already converted. Nothing to do.');
@@ -82,23 +120,6 @@ export class ConversionService {
     const limit = pLimit(options.concurrency);
     const executor = new FfmpegExecutor({ cancelSignal: this.abortController.signal });
 
-    const results: JobResult[] = [];
-
-    // Record skipped jobs in results
-    if (options.resume && skippedCount > 0) {
-      const pendingSet = new Set(pendingJobs.map((j) => j.inputPath));
-      for (const job of jobs) {
-        if (!pendingSet.has(job.inputPath)) {
-          results.push({
-            status: 'skipped',
-            inputPath: job.inputPath,
-            outputPath: job.outputPath,
-            reason: 'Output already exists',
-          });
-        }
-      }
-    }
-
     try {
       await Promise.all(
         pendingJobs.map((job) =>
@@ -107,7 +128,7 @@ export class ConversionService {
               return;
             }
 
-            const result = await this.processJob(job, executor, options);
+            const result = await this.processJob(job, executor, options, state);
             results.push(result);
             this.progress.tick(job.relativePath);
 
@@ -135,7 +156,7 @@ export class ConversionService {
     logger.info(`Report written to ${reportFile}`);
 
     if (this.interrupted) {
-      logger.warn('Conversion interrupted. Partial results saved to report.');
+      logger.warn('Conversion interrupted. Re-run with --resume to continue from state file.');
     }
 
     if (report.failed > 0) {
@@ -148,18 +169,28 @@ export class ConversionService {
   private async runDryRun(
     jobs: VideoJob[],
     options: ConvertOptions,
+    state: StateService,
     startTime: number,
   ): Promise<ConversionReport> {
     logger.info('Dry-run mode — no files will be modified.');
 
     for (const job of jobs) {
+      const entry = state.getEntry(job.relativePath);
+      const outputValid = await isValidExistingOutput(job.outputPath);
+      const inputFingerprint = await readInputFingerprint(job.inputPath);
+      const skip = shouldSkipFile(options.resume, entry, outputValid, inputFingerprint);
+
       const command = buildFfmpegCommand({
         inputPath: job.inputPath,
         outputPath: job.outputPath,
         lutPath: options.lut,
       });
-      logger.info(`[dry-run] ${job.relativePath}`);
-      logger.info(`  → ${formatFfmpegCommand(command)}`);
+
+      const action = skip ? '[dry-run] skip' : '[dry-run] convert';
+      logger.info(`${action} ${job.relativePath}`);
+      if (!skip) {
+        logger.info(`  → ${formatFfmpegCommand(command)}`);
+      }
     }
 
     const report = {
@@ -172,38 +203,43 @@ export class ConversionService {
     return report;
   }
 
-  private async filterJobs(jobs: VideoJob[], resume: boolean): Promise<VideoJob[]> {
-    if (!resume) {
-      return jobs;
-    }
-
-    const pending: VideoJob[] = [];
-    for (const job of jobs) {
-      const exists = await isValidExistingOutput(job.outputPath);
-      if (!exists) {
-        pending.push(job);
+  private async countPartialOutputs(pendingJobs: VideoJob[]): Promise<number> {
+    let count = 0;
+    for (const job of pendingJobs) {
+      try {
+        await fs.access(job.outputPath);
+        count += 1;
+      } catch {
+        // no partial file on disk
       }
     }
-    return pending;
+    return count;
   }
 
   private async processJob(
     job: VideoJob,
     executor: FfmpegExecutor,
     options: ConvertOptions,
+    state: StateService,
   ): Promise<JobResult> {
+    const inputFingerprint = await readInputFingerprint(job.inputPath);
+
     try {
       await ensureOutputDirectory(job.outputPath);
 
-      const outputExists = await isValidExistingOutput(job.outputPath);
-      if (options.resume && outputExists) {
+      const entry = state.getEntry(job.relativePath);
+      const outputValid = await isValidExistingOutput(job.outputPath);
+      if (shouldSkipFile(options.resume, entry, outputValid, inputFingerprint)) {
         return {
           status: 'skipped',
           inputPath: job.inputPath,
           outputPath: job.outputPath,
-          reason: 'Output already exists',
+          reason: 'Previously converted successfully',
         };
       }
+
+      await removePartialOutput(job.outputPath);
+      await state.markStatus(job, 'processing', { inputFingerprint });
 
       await executor.convert(
         {
@@ -211,10 +247,12 @@ export class ConversionService {
           outputPath: job.outputPath,
           lutPath: options.lut,
         },
-        !options.resume,
+        true,
       );
 
       await verifyOutputCreated(job.outputPath);
+      const outputSize = await readOutputSize(job.outputPath);
+      await state.markStatus(job, 'success', { inputFingerprint, outputSize });
 
       return {
         status: 'success',
@@ -223,13 +261,13 @@ export class ConversionService {
       };
     } catch (error) {
       const message = formatJobError(error);
+      const interrupted = this.interrupted || message === 'Interrupted';
 
-      // Clean up partial output on failure
-      try {
-        await fs.remove(job.outputPath);
-      } catch {
-        // ignore cleanup errors
-      }
+      await removePartialOutput(job.outputPath);
+      await state.markStatus(job, interrupted ? 'interrupted' : 'failed', {
+        inputFingerprint,
+        error: message,
+      });
 
       return {
         status: 'failed',

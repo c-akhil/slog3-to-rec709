@@ -5,5 +5,7 @@ dist/
 .DS_Store
 coverage/
 .slog709-report.json
+.slog709-state.json
+**/.slog709-state.json
 input-videos/
 output-videos/

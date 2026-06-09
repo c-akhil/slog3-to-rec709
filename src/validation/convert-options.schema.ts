@@ -21,6 +21,7 @@ export const convertOptionsSchema = z.object({
   dryRun: z.boolean(),
   resume: z.boolean(),
   reportPath: z.string().optional(),
+  statePath: z.string().optional(),
 });
 
 export type ConvertOptionsInput = z.infer<typeof convertOptionsSchema>;
@@ -33,6 +34,7 @@ export const cliConvertOptionsSchema = z.object({
   dryRun: z.boolean().default(false),
   resume: z.boolean().default(false),
   report: z.string().optional(),
+  state: z.string().optional(),
 });
 
 export type CliConvertOptions = z.infer<typeof cliConvertOptionsSchema>;

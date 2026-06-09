@@ -12,7 +12,7 @@ Batch-convert Sony **ILCE-7SM3 (A7S III)** S-Log3 / S-Gamut3.Cine `.MP4` footage
 - Optional `.cube` LUT for highest color accuracy
 - Built-in S-Log3 → Rec.709 filter chain when no LUT is supplied
 - Dry-run mode
-- Resume mode (skip existing outputs)
+- Resume mode (idempotent — skips only verified successes via state file)
 - JSON conversion report
 - Graceful interrupt handling (SIGINT / SIGTERM)
 
@@ -139,16 +139,55 @@ Example output:
   → ffmpeg -y -hide_banner ... -vf "lut3d=..." -c:v libx264 -crf 18 ...
 ```
 
-### Resume interrupted batch
+### Resume interrupted batch (idempotent)
 
-Skips output files that already exist and only converts what's missing:
+Resume uses a state file (default: `<output>/.slog709-state.json`) to track each file. With `--resume`:
+
+- **Skipped:** files marked `success` in the state file, with a valid output on disk
+- **Re-processed:** failed, interrupted, or partial outputs
+- **Safe to re-run:** running the same command multiple times continues where it left off
 
 ```bash
 npm start -- convert \
-  --input "./input-videos" \
+  --input "../pre-wedding" \
   --output "./output-videos" \
   --lut "./SonyLookProfiles_SLog3_SGamut3Cine/1_SGamut3CineSLog3_To_LC-709.cube" \
+  --concurrency 1 \
   --resume
+```
+
+Custom state file path:
+
+```bash
+npm start -- convert \
+  --input "../pre-wedding" \
+  --output "./output-videos" \
+  --state "./output-videos/conversion-state.json" \
+  --resume
+```
+
+Example state entry:
+
+```json
+{
+  "version": 1,
+  "input": "/Users/akhilkumar/akhil/pre-wedding",
+  "output": "/Users/akhilkumar/akhil/orginal-videos/output-videos",
+  "files": {
+    "Ceremony/C4400.MP4": {
+      "status": "success",
+      "relativePath": "Ceremony/C4400.MP4",
+      "inputSize": 134485475,
+      "outputSize": 98234112,
+      "updatedAt": "2026-06-09T10:30:00.000Z"
+    },
+    "Ceremony/C4401.MP4": {
+      "status": "interrupted",
+      "error": "Interrupted",
+      "updatedAt": "2026-06-09T10:31:00.000Z"
+    }
+  }
+}
 ```
 
 ### Custom report path
@@ -181,7 +220,8 @@ slog709 convert \
 | `-l, --lut <path>` | Optional `.cube` LUT file |
 | `-c, --concurrency <n>` | Parallel jobs (default: 4, max: 64) |
 | `--dry-run` | Print planned FFmpeg commands without executing |
-| `--resume` | Skip output files that already exist |
+| `--resume` | Skip files recorded as `success` in the state file |
+| `-s, --state <path>` | Resume state JSON (default: `<output>/.slog709-state.json`) |
 | `-r, --report <path>` | Write JSON report to custom path |
 
 ## FFmpeg Commands

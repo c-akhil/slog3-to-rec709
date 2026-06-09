@@ -13,12 +13,42 @@ export interface ConvertOptions {
   dryRun: boolean;
   resume: boolean;
   reportPath?: string;
+  statePath?: string;
 }
 
 export interface VideoJob {
   inputPath: string;
   outputPath: string;
   relativePath: string;
+}
+
+export type FileJobStatus = 'pending' | 'processing' | 'success' | 'failed' | 'interrupted';
+
+export interface InputFingerprint {
+  size: number;
+  mtimeMs: number;
+}
+
+export interface FileStateEntry {
+  status: FileJobStatus;
+  relativePath: string;
+  inputPath: string;
+  outputPath: string;
+  inputSize: number;
+  inputMtimeMs: number;
+  outputSize?: number;
+  updatedAt: string;
+  error?: string;
+}
+
+export interface ConversionState {
+  version: 1;
+  input: string;
+  output: string;
+  lut?: string;
+  startedAt: string;
+  updatedAt: string;
+  files: Record<string, FileStateEntry>;
 }
 
 export type JobResult =
