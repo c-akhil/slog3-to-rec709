@@ -2,11 +2,47 @@ import path from 'node:path';
 
 const MP4_EXTENSION = '.mp4';
 
+export const IMAGE_EXTENSIONS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.heic',
+  '.heif',
+  '.tif',
+  '.tiff',
+  '.arw',
+  '.webp',
+]);
+
 /**
  * Returns true when the file has a .mp4 extension (case-insensitive).
  */
 export function isMp4File(filePath: string): boolean {
   return path.extname(filePath).toLowerCase() === MP4_EXTENSION;
+}
+
+/**
+ * Returns true for common still-image extensions (case-insensitive).
+ */
+export function isImageFile(filePath: string): boolean {
+  return IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+}
+
+/**
+ * Returns true when the file is a supported video or image for conversion.
+ */
+export function isConvertibleMediaFile(filePath: string): boolean {
+  return isMp4File(filePath) || isImageFile(filePath);
+}
+
+export function getMediaType(filePath: string): 'video' | 'image' | null {
+  if (isMp4File(filePath)) {
+    return 'video';
+  }
+  if (isImageFile(filePath)) {
+    return 'image';
+  }
+  return null;
 }
 
 /**

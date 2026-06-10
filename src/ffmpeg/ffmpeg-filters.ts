@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 /**
  * FFmpeg video filter for Sony ILCE-7SM3 (A7S III) S-Log3 / S-Gamut3.Cine → Rec.709.
  *
@@ -30,6 +32,22 @@ export const SLOG3_TO_REC709_FILTER = [
 ].join(',');
 
 export const ENCODE_ARGS = ['-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-c:a', 'copy'] as const;
+
+export function buildImageEncodeArgs(outputPath: string): string[] {
+  const ext = path.extname(outputPath).toLowerCase();
+  const base = ['-frames:v', '1', '-update', '1'];
+
+  switch (ext) {
+    case '.png':
+      return base;
+    case '.webp':
+      return [...base, '-quality', '90'];
+    case '.jpg':
+    case '.jpeg':
+    default:
+      return [...base, '-q:v', '2'];
+  }
+}
 
 export const OVERWRITE_ARG = '-y' as const;
 export const NO_OVERWRITE_ARG = '-n' as const;

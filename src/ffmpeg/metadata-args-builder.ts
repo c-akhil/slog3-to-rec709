@@ -9,6 +9,28 @@ export const CONTAINER_GENERATED_TAGS = new Set([
 /**
  * Builds FFmpeg arguments to copy container, stream, and chapter metadata from the source.
  */
+export function buildImageMetadataCopyArgs(snapshot: MediaMetadataSnapshot): string[] {
+  const args: string[] = ['-map_metadata', '0'];
+
+  const videoStream = snapshot.streams.find((stream) => stream.codecType === 'video');
+
+  if (videoStream) {
+    args.push('-map_metadata:s:v', '0:s:v');
+  }
+
+  for (const [key, value] of Object.entries(snapshot.formatTags)) {
+    args.push('-metadata', `${key}=${sanitizeMetadataValue(value)}`);
+  }
+
+  if (videoStream) {
+    for (const [key, value] of Object.entries(videoStream.tags)) {
+      args.push('-metadata:s:v:0', `${key}=${sanitizeMetadataValue(value)}`);
+    }
+  }
+
+  return args;
+}
+
 export function buildMetadataCopyArgs(snapshot: MediaMetadataSnapshot): string[] {
   const args: string[] = [
     '-map_metadata',
@@ -22,27 +44,29 @@ export function buildMetadataCopyArgs(snapshot: MediaMetadataSnapshot): string[]
   const videoStream = snapshot.streams.find((stream) => stream.codecType === 'video');
   const audioStream = snapshot.streams.find((stream) => stream.codecType === 'audio');
 
+  // FFmpeg map_metadata input spec uses *input file index* (always 0 here), not ffprobe stream index.
+  // Using audio stream index "1:s:a" is parsed as input file 1 and fails on single-input encodes.
   if (videoStream) {
-    args.push('-map_metadata:s:v', `${videoStream.index}:s:v`);
+    args.push('-map_metadata:s:v', '0:s:v');
   }
 
   if (audioStream) {
-    args.push('-map_metadata:s:a', `${audioStream.index}:s:a`);
+    args.push('-map_metadata:s:a', '0:s:a');
   }
 
   for (const [key, value] of Object.entries(snapshot.formatTags)) {
-    args.push('-metadata', `${key}=${value}`);
+    args.push('-metadata', `${key}=${sanitizeMetadataValue(value)}`);
   }
 
   if (videoStream) {
     for (const [key, value] of Object.entries(videoStream.tags)) {
-      args.push('-metadata:s:v:0', `${key}=${value}`);
+      args.push('-metadata:s:v:0', `${key}=${sanitizeMetadataValue(value)}`);
     }
   }
 
   if (audioStream) {
     for (const [key, value] of Object.entries(audioStream.tags)) {
-      args.push('-metadata:s:a:0', `${key}=${value}`);
+      args.push('-metadata:s:a:0', `${key}=${sanitizeMetadataValue(value)}`);
     }
   }
 
@@ -132,4 +156,9 @@ function describeScope(field: MetadataField): string {
 
 function normalizeValue(value: string): string {
   return value.trim();
+}
+
+/** Strip characters that break FFmpeg metadata argument parsing. */
+function sanitizeMetadataValue(value: string): string {
+  return value.replace(/\0/g, '').replace(/[\r\n]/g, ' ').trim();
 }

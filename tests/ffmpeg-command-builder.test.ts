@@ -125,4 +125,19 @@ describe('FFmpeg command builder', () => {
     const vfIndex = command.args.indexOf('-vf');
     expect(command.args[vfIndex + 1]).toContain("My LUTs");
   });
+
+  it('builds image conversion command with LUT and metadata flags', () => {
+    const command = buildFfmpegCommand({
+      inputPath: '/in/M4ROOT/THMBNL/C4422T01.JPG',
+      outputPath: '/out/M4ROOT/THMBNL/C4422T01.JPG',
+      lutPath: '/lut.cube',
+      mediaType: 'image',
+    });
+
+    expect(command.args).toContain('-frames:v');
+    expect(command.args).toContain('1');
+    expect(command.args).toContain('-map_metadata');
+    expect(command.args).not.toContain('-c:a');
+    expect(command.args).not.toContain('-map_chapters');
+  });
 });

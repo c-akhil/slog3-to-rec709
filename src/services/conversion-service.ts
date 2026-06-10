@@ -1,6 +1,6 @@
 import fs from 'fs-extra';
 import pLimit from 'p-limit';
-import type { ConvertOptions, ConversionReport, JobResult, VideoJob } from '../types/index.js';
+import type { ConvertOptions, ConversionReport, JobResult, MediaJob } from '../types/index.js';
 import { FfmpegExecutor } from '../ffmpeg/ffmpeg-executor.js';
 import { buildFfmpegCommand, formatFfmpegCommand } from '../ffmpeg/ffmpeg-command-builder.js';
 import {
@@ -57,13 +57,21 @@ export class ConversionService {
     const jobs = await this.scanner.scan(options.input, options.output);
 
     if (jobs.length === 0) {
-      logger.warn('No .MP4 files found in input directory.');
+      logger.warn('No supported media files found in input directory (.MP4, .JPG, .PNG, etc.).');
       const emptyReport = createEmptyReport(0);
       await this.reportService.write(emptyReport, options.reportPath);
       return emptyReport;
     }
 
-    logger.info(`Found ${jobs.length} .MP4 file(s) to process.`);
+    const { videos, images } = this.scanner.countByType(jobs);
+    const parts = [];
+    if (videos > 0) {
+      parts.push(`${videos} video(s)`);
+    }
+    if (images > 0) {
+      parts.push(`${images} image(s)`);
+    }
+    logger.info(`Found ${jobs.length} file(s) to process (${parts.join(', ')}).`);
 
     const stateLoad = await StateService.load(options);
     const state = stateLoad.service;
@@ -176,7 +184,7 @@ export class ConversionService {
   }
 
   private async runDryRun(
-    jobs: VideoJob[],
+    jobs: MediaJob[],
     options: ConvertOptions,
     state: StateService,
     startTime: number,
@@ -193,6 +201,7 @@ export class ConversionService {
         inputPath: job.inputPath,
         outputPath: job.outputPath,
         lutPath: options.lut,
+        mediaType: job.mediaType,
       });
 
       const action = skip ? '[dry-run] skip' : '[dry-run] convert';
@@ -212,7 +221,7 @@ export class ConversionService {
     return report;
   }
 
-  private async countPartialOutputs(pendingJobs: VideoJob[]): Promise<number> {
+  private async countPartialOutputs(pendingJobs: MediaJob[]): Promise<number> {
     let count = 0;
     for (const job of pendingJobs) {
       try {
@@ -226,7 +235,7 @@ export class ConversionService {
   }
 
   private async processJob(
-    job: VideoJob,
+    job: MediaJob,
     executor: FfmpegExecutor,
     metadataService: MetadataService,
     options: ConvertOptions,
@@ -256,6 +265,7 @@ export class ConversionService {
           inputPath: job.inputPath,
           outputPath: job.outputPath,
           lutPath: options.lut,
+          mediaType: job.mediaType,
         },
         true,
       );
@@ -265,6 +275,7 @@ export class ConversionService {
       const { verification } = await metadataService.preserveAfterConversion(
         job.inputPath,
         job.outputPath,
+        job.mediaType,
       );
 
       const outputSize = await readOutputSize(job.outputPath);

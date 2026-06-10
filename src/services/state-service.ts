@@ -6,7 +6,7 @@ import type {
   FileJobStatus,
   FileStateEntry,
   InputFingerprint,
-  VideoJob,
+  MediaJob,
 } from '../types/index.js';
 
 export const STATE_FILENAME = '.slog709-state.json';
@@ -123,13 +123,13 @@ export class StateService {
   }
 
   async classifyJobs(
-    jobs: VideoJob[],
+    jobs: MediaJob[],
     resume: boolean,
     isOutputValid: (outputPath: string) => Promise<boolean>,
     getInputFingerprint: (inputPath: string) => Promise<InputFingerprint>,
-  ): Promise<{ pending: VideoJob[]; skipped: VideoJob[] }> {
-    const pending: VideoJob[] = [];
-    const skipped: VideoJob[] = [];
+  ): Promise<{ pending: MediaJob[]; skipped: MediaJob[] }> {
+    const pending: MediaJob[] = [];
+    const skipped: MediaJob[] = [];
 
     for (const job of jobs) {
       const entry = this.getEntry(job.relativePath);
@@ -147,7 +147,7 @@ export class StateService {
   }
 
   async markStatus(
-    job: VideoJob,
+    job: MediaJob,
     status: FileJobStatus,
     extras: {
       inputFingerprint: InputFingerprint;

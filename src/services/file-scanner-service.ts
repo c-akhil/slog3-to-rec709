@@ -1,20 +1,21 @@
 import fs from 'fs-extra';
 import path from 'node:path';
-import type { VideoJob } from '../types/index.js';
-import { isMp4File, mapInputToOutput } from '../utils/paths.js';
+import type { MediaJob } from '../types/index.js';
+import { getMediaType, isConvertibleMediaFile, mapInputToOutput } from '../utils/paths.js';
 
 export class FileScannerService {
   /**
-   * Recursively scans inputRoot for .MP4 files and maps each to an output path
-   * that preserves the folder structure relative to inputRoot.
+   * Recursively scans inputRoot for .MP4 videos and supported still images,
+   * mapping each to an output path that preserves the relative folder structure.
    */
-  async scan(inputRoot: string, outputRoot: string): Promise<VideoJob[]> {
+  async scan(inputRoot: string, outputRoot: string): Promise<MediaJob[]> {
     const resolvedInput = path.resolve(inputRoot);
     const resolvedOutput = path.resolve(outputRoot);
-    const jobs: VideoJob[] = [];
+    const jobs: MediaJob[] = [];
 
     await this.walk(resolvedInput, async (filePath) => {
-      if (!isMp4File(filePath)) {
+      const mediaType = getMediaType(filePath);
+      if (!mediaType) {
         return;
       }
 
@@ -23,11 +24,25 @@ export class FileScannerService {
         inputPath: filePath,
         outputPath: mapInputToOutput(resolvedInput, resolvedOutput, filePath),
         relativePath,
+        mediaType,
       });
     });
 
     jobs.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
     return jobs;
+  }
+
+  countByType(jobs: MediaJob[]): { videos: number; images: number } {
+    let videos = 0;
+    let images = 0;
+    for (const job of jobs) {
+      if (job.mediaType === 'video') {
+        videos += 1;
+      } else {
+        images += 1;
+      }
+    }
+    return { videos, images };
   }
 
   private async walk(dir: string, onFile: (filePath: string) => Promise<void>): Promise<void> {
@@ -47,7 +62,7 @@ export class FileScannerService {
 
       if (entry.isDirectory()) {
         await this.walk(fullPath, onFile);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile() && isConvertibleMediaFile(fullPath)) {
         await onFile(fullPath);
       }
     }

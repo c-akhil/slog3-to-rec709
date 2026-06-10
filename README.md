@@ -6,7 +6,7 @@ Cross-platform CLI for **macOS**, **Windows**, and **Linux**.
 
 ## Features
 
-- Recursively scans input directories (all subfolders)
+- Recursively scans input directories for `.MP4` videos and still images (`.JPG`, `.PNG`, `.HEIC`, etc.)
 - Preserves folder structure in output
 - Never modifies original files — creates converted copies only
 - Parallel processing with configurable concurrency (default: 4)
@@ -233,12 +233,14 @@ Subfolders are preserved automatically:
 ```
 input-videos/
 ├── Ceremony/C4400.MP4
-└── Reception/C4401.MP4
+└── M4ROOT/THMBNL/C4422T01.JPG
 
 output-videos/
 ├── Ceremony/C4400.MP4
-└── Reception/C4401.MP4
+└── M4ROOT/THMBNL/C4422T01.JPG
 ```
+
+Supported still-image formats: `.JPG`, `.JPEG`, `.PNG`, `.HEIC`, `.HEIF`, `.TIF`, `.TIFF`, `.ARW`, `.WEBP` (including Sony `M4ROOT/THMBNL/` thumbnails).
 
 ### Built-in conversion (no LUT)
 

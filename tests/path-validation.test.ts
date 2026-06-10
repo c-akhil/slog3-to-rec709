@@ -7,6 +7,8 @@ import {
 import {
   escapeFfmpegFilterPath,
   isMp4File,
+  isImageFile,
+  getMediaType,
   isOutputInsideInput,
   isValidPathString,
   mapInputToOutput,
@@ -23,6 +25,18 @@ describe('path validation', () => {
     expect(isMp4File('clip.Mp4')).toBe(true);
     expect(isMp4File('clip.mov')).toBe(false);
     expect(isMp4File('clip.mp4.bak')).toBe(false);
+  });
+
+  it('identifies supported image files case-insensitively', () => {
+    expect(isImageFile('thumb.JPG')).toBe(true);
+    expect(isImageFile('photo.heic')).toBe(true);
+    expect(isImageFile('clip.MP4')).toBe(false);
+  });
+
+  it('detects media type from extension', () => {
+    expect(getMediaType('clip.MP4')).toBe('video');
+    expect(getMediaType('thumb.JPG')).toBe('image');
+    expect(getMediaType('sidecar.XML')).toBe(null);
   });
 
   it('maps input paths to output paths preserving structure', () => {

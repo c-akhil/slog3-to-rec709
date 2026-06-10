@@ -74,6 +74,7 @@ export class FfmpegExecutor {
         inputPath,
         outputPath,
         lutPath: options.lutPath ? path.resolve(options.lutPath) : undefined,
+        mediaType: options.mediaType ?? 'video',
         metadataSnapshot,
       },
       { executable: this.executable, overwrite },

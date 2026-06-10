@@ -28,13 +28,17 @@ export class MetadataService {
     return this.ffprobe.extractMetadata(sourcePath);
   }
 
-  async preserveAfterConversion(sourcePath: string, outputPath: string): Promise<{
+  async preserveAfterConversion(
+    sourcePath: string,
+    outputPath: string,
+    mediaType: 'video' | 'image' = 'video',
+  ): Promise<{
     verification: MetadataVerificationResult;
     filesystem: FilesystemTimestampResult;
   }> {
     const sourceMetadata = await this.ffprobe.extractMetadata(sourcePath);
 
-    if (sourceMetadata.hasSubtitleStreams) {
+    if (mediaType === 'video' && sourceMetadata.hasSubtitleStreams) {
       logger.warn(
         `Subtitle stream metadata cannot be copied for ${path.basename(sourcePath)}: output contains re-encoded video/audio only.`,
       );
@@ -44,7 +48,11 @@ export class MetadataService {
     let mismatches = compareMetadata(sourceMetadata, outputMetadata);
 
     if (mismatches.length > 0) {
-      await this.remuxMetadataFromSource(outputPath, sourcePath);
+      if (mediaType === 'image') {
+        await this.remuxImageMetadataFromSource(outputPath, sourcePath);
+      } else {
+        await this.remuxMetadataFromSource(outputPath, sourcePath);
+      }
       outputMetadata = await this.ffprobe.extractMetadata(outputPath);
       mismatches = compareMetadata(sourceMetadata, outputMetadata);
     }
@@ -55,12 +63,49 @@ export class MetadataService {
     const verification: MetadataVerificationResult = {
       matched: flattenMetadata(sourceMetadata).length - mismatches.length,
       mismatches,
-      subtitleMetadataSkipped: sourceMetadata.hasSubtitleStreams,
+      subtitleMetadataSkipped: mediaType === 'video' && sourceMetadata.hasSubtitleStreams,
     };
 
     this.logVerificationResult(path.basename(sourcePath), verification, filesystem);
 
     return { verification, filesystem };
+  }
+
+  private async remuxImageMetadataFromSource(
+    outputPath: string,
+    sourcePath: string,
+  ): Promise<void> {
+    const ext = path.extname(outputPath);
+    const tempPath = `${outputPath}.metadata.tmp${ext}`;
+
+    try {
+      await execa(
+        'ffmpeg',
+        [
+          '-y',
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-i',
+          outputPath,
+          '-i',
+          sourcePath,
+          '-map',
+          '0:v:0',
+          '-map_metadata',
+          '1',
+          '-c',
+          'copy',
+          tempPath,
+        ],
+        { reject: true, cancelSignal: this.cancelSignal },
+      );
+
+      await fs.move(tempPath, outputPath, { overwrite: true });
+    } catch (error) {
+      await fs.remove(tempPath).catch(() => undefined);
+      throw error;
+    }
   }
 
   private async remuxMetadataFromSource(outputPath: string, sourcePath: string): Promise<void> {

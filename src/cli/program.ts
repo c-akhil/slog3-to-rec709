@@ -5,9 +5,9 @@ export function registerConvertCommand(program: Command): void {
   program
     .command('convert')
     .description(
-      'Batch-convert Sony A7S III S-Log3 (.MP4) footage to Rec.709 using FFmpeg',
+      'Batch-convert Sony A7S III S-Log3 (.MP4) footage and stills (.JPG, etc.) to Rec.709 using FFmpeg',
     )
-    .requiredOption('-i, --input <path>', 'Source directory containing .MP4 files')
+    .requiredOption('-i, --input <path>', 'Source directory containing .MP4 and image files')
     .requiredOption('-o, --output <path>', 'Output directory for converted files')
     .option('-l, --lut <path>', 'Optional .cube LUT for color conversion')
     .option(

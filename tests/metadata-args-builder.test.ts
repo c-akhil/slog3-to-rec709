@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildImageMetadataCopyArgs,
   buildMetadataCopyArgs,
   compareMetadata,
   flattenMetadata,
@@ -35,6 +36,19 @@ describe('metadata-args-builder', () => {
     hasSubtitleStreams: false,
   };
 
+  it('builds image-specific metadata copy arguments', () => {
+    const args = buildImageMetadataCopyArgs({
+      formatTags: { artist: 'Sony' },
+      streams: [{ index: 0, codecType: 'video', tags: { comment: 'thumb' } }],
+      hasSubtitleStreams: false,
+    });
+
+    expect(args).toContain('-map_metadata');
+    expect(args).toContain('artist=Sony');
+    expect(args).not.toContain('-map_chapters');
+    expect(args).not.toContain('use_metadata_tags');
+  });
+
   it('builds metadata copy arguments for format and streams', () => {
     const args = buildMetadataCopyArgs(snapshot);
 
@@ -46,7 +60,8 @@ describe('metadata-args-builder', () => {
     expect(args).toContain('-map_metadata:s:v');
     expect(args).toContain('0:s:v');
     expect(args).toContain('-map_metadata:s:a');
-    expect(args).toContain('1:s:a');
+    expect(args).toContain('0:s:a');
+    expect(args).not.toContain('1:s:a');
     expect(args).toContain('-metadata');
     expect(args).toContain('artist=Sony Camera');
     expect(args).toContain('-metadata:s:v:0');

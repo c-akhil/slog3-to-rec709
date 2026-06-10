@@ -17,11 +17,17 @@ export interface ConvertOptions {
   statePath?: string;
 }
 
-export interface VideoJob {
+export type MediaType = 'video' | 'image';
+
+export interface MediaJob {
   inputPath: string;
   outputPath: string;
   relativePath: string;
+  mediaType: MediaType;
 }
+
+/** @deprecated Use MediaJob */
+export type VideoJob = MediaJob;
 
 export type FileJobStatus = 'pending' | 'processing' | 'success' | 'failed' | 'interrupted';
 
@@ -63,6 +69,7 @@ export interface FfmpegEncodeOptions {
   inputPath: string;
   outputPath: string;
   lutPath?: string;
+  mediaType?: MediaType;
   metadataSnapshot?: MediaMetadataSnapshot;
 }
 
